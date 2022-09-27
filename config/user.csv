@@ -2,6 +2,6 @@
 idx,name,age,gender,ADDR,nothing,intarrary,stringarrary,email,ratio,floatarrary
 int,string,Int,INT,String,string,[]int,[]string,string,float,[]float
 #第一列首字符是“#”，整行忽略；第一列不允许为空,,,,,,,,,浮点数,浮点数组
-11,武则天,,0,家庭地址1,,1|2|3,,safz@aaa1.com,1,1.11203
+11,"武则，,天",,0,家庭地址1,,1|2|3,,safz@aaa1.com,1,1.11203
 9,name_1,33,1,address2,,,你|hello|g狗,,1.001,1.11203|2.45
 10001,a你好a,234680,2,,,77,,zzz@aaa.com,1.11203,

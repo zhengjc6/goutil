@@ -2,10 +2,15 @@ package main
 
 import (
 	"fmt"
+	"goutil/csvparse"
 	"goutil/redislocker"
-	csvData "goutil/static/conf"
+
 	"math/rand"
+	"os"
+	"strings"
 	"time"
+
+	csvdata "goutil/static/conf"
 
 	"github.com/go-redis/redis"
 )
@@ -47,25 +52,30 @@ func testredislocker() {
 	}
 }
 
-func testcsvparse() {
-	//pwd, _ := os.Getwd()
-	// fileName := "config"
-	// var bt strings.Builder
-	// bt.WriteString(pwd)
-	// bt.WriteString("\\")
-	// bt.WriteString(fileName)
-	// outDir := pwd + "\\static\\conf"
-	// if err := os.RemoveAll(outDir); os.IsNotExist(err) {
-	// 	panic(err)
-	// }
-	// csvparse.ParseDir(bt.String(), outDir, "csvData")
+func testcsvparseread() {
+	data := csvdata.CSVData
+	data2 := data.UserTable[11]
+	fmt.Printf("%+v\n", data)
+	fmt.Printf("%+v\n", data2)
+}
 
-	data := csvData.CreateUserTable()
-	fmt.Println(data[11])
+func testcsvparse() {
+	pwd, _ := os.Getwd()
+	fileName := "config"
+	var bt strings.Builder
+	bt.WriteString(pwd)
+	bt.WriteString("\\")
+	bt.WriteString(fileName)
+	outDir := pwd + "\\static\\conf"
+	if err := os.RemoveAll(outDir); err != nil && !os.IsNotExist(err) {
+		panic(err)
+	}
+	csvparse.ParseDir(bt.String(), outDir, "csvdata")
 }
 
 func main() {
 	// 	testredislocker()
 	// 	time.Sleep(time.Minute)
 	testcsvparse()
+	//testcsvparseread()
 }

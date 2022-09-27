@@ -13,10 +13,10 @@ type RedisLocker struct {
 	client    *redis.Client
 	lockKey   string
 	lockValue int64
-	unlockCh  chan struct{} //用户解锁通知通道
-	holdTime  time.Duration //持有时间  ns
-	tryCount  int32         //lock时尝试次数
-	tryGap    time.Duration //lock时尝试间隔 ns
+	unlockCh  chan struct{} //the unlock chan used to notice watdog co to exit
+	holdTime  time.Duration //lock duration
+	tryCount  int32         //max trying times
+	tryGap    time.Duration //the interval time of tring to get lock
 }
 
 type RedisLockerWorker interface {
@@ -29,21 +29,21 @@ func (rl *RedisLocker) Lock() error {
 	var resp *redis.BoolCmd
 	for i := 0; i < int(rl.tryCount); i++ {
 
-		resp = rl.client.SetNX(rl.lockKey, rl.lockValue, rl.holdTime) //返回执行结果
+		resp = rl.client.SetNX(rl.lockKey, rl.lockValue, rl.holdTime)
 
 		lockSuccess, err := resp.Result()
 
 		if err == nil && lockSuccess {
 
-			//抢锁成功，开启看门狗 并跳出，否则失败继续自旋
+			//lock sucessfully, run watchDog
 
 			go watchDog(rl)
 
 			return nil
 
 		} else {
-			//fmt.Printf("%v spin %d\n", rl.lockValu e,i)
-			time.Sleep(time.Duration(rl.tryGap)) //休眠
+			//sleep && spin
+			time.Sleep(time.Duration(rl.tryGap))
 		}
 	}
 	return errors.New("Lock Time Out")
@@ -63,26 +63,23 @@ func (rl *RedisLocker) Unlock() error {
 
 	if result, err := resp.Result(); err != nil || result == 0 {
 
-		return errors.New(fmt.Sprintf("unlock failed:", err))
+		return fmt.Errorf("unlock failed:%s", err.Error())
 
 	} else {
 
-		//删锁成功后，通知看门狗退出
+		//notice watchDog to exit
 
 		rl.unlockCh <- struct{}{}
 	}
 	return nil
 }
 
-//自动续期看门狗
-
+// watch dog prolinging period of lock validity
 func watchDog(rl *RedisLocker) {
-
-	// 创建一个定时器NewTicker, 每隔2秒触发一次,类似于闹钟
 
 	expTicker := time.NewTicker(time.Second * time.Duration(rl.holdTime/5*4))
 
-	//确认锁与锁续期打包原子化
+	//using lua script to make sure atomic process
 
 	script := redis.NewScript(`
 		if redis.call('get', KEYS[1]) == ARGV[1] then 
@@ -96,19 +93,17 @@ func watchDog(rl *RedisLocker) {
 
 		select {
 
-		case <-expTicker.C: //定时器，所以每隔80%*holdTime都会触发
+		case <-expTicker.C:
 
 			resp := script.Run(rl.client, []string{rl.lockKey}, rl.lockValue, rl.holdTime)
 
 			if result, err := resp.Result(); err != nil || result == int64(0) {
 
-				//续期失败
-
 				log.Println("expire lock failed", err)
 
 			}
 
-		case <-rl.unlockCh: //任务完成后用户解锁通知看门狗退出
+		case <-rl.unlockCh: //receive exit ch
 
 			return
 
