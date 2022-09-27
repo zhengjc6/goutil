@@ -1,0 +1,7 @@
+唯一id,字段1,字段2,字段3,字段4,字段5,字段6整形数组,字段7字符串数组,字段8,字段9
+idx,name,age,gender,ADDR,nothing,intarrary,stringarrary,email,ratio
+int,string,Int,INT,String,string,[]int,[]string,string,float
+#第一列首字符是“#”，整行忽略；第一列不允许为空,,,,,,注意用半角逗号,,,浮点数
+11,武则天,1,0,家庭地址1,,"{1,2,3}",,safz@aaa1.com,1
+9,name_1,33,1,address2,,,"{你好,hello,g狗}",,1
+10001,a你好a,234680,2,,,{77},,zzz@aaa.com,1.11203
