@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	csvdata "goutil/static/conf"
+	//csvdata "goutil/static/conf"
 
 	"github.com/go-redis/redis"
 )
@@ -52,12 +52,12 @@ func testredislocker() {
 	}
 }
 
-func testcsvparseread() {
-	data := csvdata.CSVData
-	data2 := data.UserTable[11]
-	fmt.Printf("%+v\n", data)
-	fmt.Printf("%+v\n", data2)
-}
+// func testcsvparseread() {
+// 	data := csvdata.CSVData
+// 	data2 := data.UserTable[11]
+// 	fmt.Printf("%+v\n", data)
+// 	fmt.Printf("%+v\n", data2)
+// }
 
 func testcsvparse() {
 	pwd, _ := os.Getwd()

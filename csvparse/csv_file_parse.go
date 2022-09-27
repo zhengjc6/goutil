@@ -127,7 +127,7 @@ func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapNam
 	outFile.WriteString(fmt.Sprintf("package %s\n", pkgName))
 	outFile.WriteString(fmt.Sprintf("type %s struct {\n", fileNameOnly))
 	for i := 0; i < len(valcomments); i++ {
-		outFile.WriteString(fmt.Sprintf("\t%s\t%s\n", valnames[i], typeMap[valtypes[i]]))
+		outFile.WriteString(fmt.Sprintf("\t%s\t\t%s\t\t//%s\n", valnames[i], typeMap[valtypes[i]], valcomments[i]))
 	}
 	outFile.WriteString("}\n")
 
