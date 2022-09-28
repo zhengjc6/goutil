@@ -52,11 +52,11 @@ func parseCol(colName, colType, colStr string) string {
 
 func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapName string, err error) {
 	fmt.Printf("fullPath = %s\n", filePath)
-	//获取文件名称带后缀
+
 	fileNameWithSuffix := path.Base(filepath.ToSlash(filePath))
-	//获取文件的后缀(文件类型)
+
 	fileType := path.Ext(fileNameWithSuffix)
-	//获取文件名称(不带后缀)
+
 	fileNameOnly = strings.TrimSuffix(fileNameWithSuffix, fileType)
 	fmt.Printf("fileNameWithSuffix = %s;\nfileType = %s;\nfileNameOnly = %s;\n",
 		fileNameWithSuffix, fileType, fileNameOnly)
@@ -67,7 +67,7 @@ func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapNam
 	}
 	defer file.Close()
 	reader := csv.NewReader(file)
-	//前三行格式固定
+
 	var valcomments []string
 	var valnames []string
 	var valtypes []string
