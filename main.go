@@ -76,6 +76,8 @@ func testcsvparse() {
 func main() {
 	// 	testredislocker()
 	// 	time.Sleep(time.Minute)
-	testcsvparse()
+	//testcsvparse()
 	//testcsvparseread()
+	// fmt.Println("return:", testdefer())
+	// fmt.Println("return:", testdefer2())
 }
