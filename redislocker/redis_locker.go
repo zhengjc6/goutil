@@ -101,6 +101,7 @@ func watchDog(rl *RedisLocker) {
 
 				log.Println("expire lock failed", err)
 
+				return
 			}
 
 		case <-rl.unlockCh: //receive exit ch
@@ -121,6 +122,6 @@ func NewLocker(rclient *redis.Client, key string, val int64) *RedisLocker {
 	locker.holdTime = 10 * time.Second
 	locker.tryCount = 100
 	locker.tryGap = time.Second / 100
-	locker.unlockCh = make(chan struct{}, 0)
+	locker.unlockCh = make(chan struct{})
 	return &locker
 }
