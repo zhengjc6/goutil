@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"goutil/csvparse"
 	"goutil/redislocker"
+	"goutil/snowflake"
 
 	"math/rand"
 	"os"
@@ -73,6 +74,40 @@ func testcsvparse() {
 	csvparse.ParseDir(bt.String(), outDir, "csvdata")
 }
 
+func testsnowflake() {
+	if err := snowflake.NewSnow(1005); err != nil {
+		fmt.Println(err)
+		return
+	}
+	snowins, err := snowflake.Instanse()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	mp := map[int64]bool{}
+	maxN := 10000
+	ch := make(chan int64, maxN)
+	for i := 0; i < maxN; i++ {
+		go func() {
+			uid := snowins.NextVal()
+			fmt.Println(uid)
+			ch <- uid
+		}()
+	}
+	for {
+		select {
+		case data := <-ch:
+			if _, ok := mp[data]; ok {
+				fmt.Println("same uid!")
+			} else {
+				mp[data] = true
+			}
+		case <-time.Tick(time.Second * 5):
+			fmt.Println("running,mapsize = ", len(mp))
+		}
+	}
+}
+
 func main() {
 	// 	testredislocker()
 	// 	time.Sleep(time.Minute)
@@ -80,4 +115,5 @@ func main() {
 	//testcsvparseread()
 	// fmt.Println("return:", testdefer())
 	// fmt.Println("return:", testdefer2())
+	testsnowflake()
 }
