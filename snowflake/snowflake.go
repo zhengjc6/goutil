@@ -28,26 +28,29 @@ type Snowflake struct {
 	sequence  int64      // 序列号
 }
 
-var instanse *Snowflake
+var instanceD *Snowflake
+var once sync.Once
 
 func NewSnow(wid int64) error {
 	if wid < 0 || wid > workeridMax {
 		return fmt.Errorf("workeridMax limit = %d", workeridMax)
 	}
-	instanse = &Snowflake{
-		mutex:     sync.Mutex{},
-		timestamp: 0,
-		workerid:  wid,
-		sequence:  0,
-	}
+	once.Do(func() {
+		instanceD = &Snowflake{
+			mutex:     sync.Mutex{},
+			timestamp: 0,
+			workerid:  wid,
+			sequence:  0,
+		}
+	})
 	return nil
 }
 
-func Instanse() (*Snowflake, error) {
-	if instanse == nil {
+func Instance() (*Snowflake, error) {
+	if instanceD == nil {
 		return nil, errors.New("snowflake not init")
 	}
-	return instanse, nil
+	return instanceD, nil
 }
 
 type InterfaceSnowFlake interface {

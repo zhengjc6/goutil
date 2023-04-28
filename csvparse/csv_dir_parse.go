@@ -2,21 +2,20 @@ package csvparse
 
 import (
 	"fmt"
-	"goutil/strtool"
-	"io/ioutil"
-	"log"
+	"metaserver/pkg/strtool"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 )
 
-func visit(files *[]string) filepath.WalkFunc {
+func visit(files *[]string, exts *map[string]bool) filepath.WalkFunc {
 	return func(filePath string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Fatal(err)
-		}
-		if path.Ext(filePath) == ".csv" {
+		var ext = path.Ext(filePath)
+		_, ok := (*exts)[ext]
+		//fmt.Println(filePath, ext)
+		if ok {
+			//fmt.Println("exist")
 			*files = append(*files, filePath)
 		}
 		return nil
@@ -35,17 +34,10 @@ func ParseDir(dirPath, outputDir, pkgName string) error {
 		} else {
 			return err
 		}
-	} else {
-		//the dir must be empty,otherwise it needs to be emptied manually
-		dir, _ := ioutil.ReadDir(outputDir)
-		if len(dir) > 0 {
-			return fmt.Errorf("please lean the output dir:%s", outputDir)
-		}
 	}
 
 	var files []string
-
-	err = filepath.Walk(dirPath, visit(&files))
+	err = filepath.Walk(dirPath, visit(&files, &map[string]bool{".csv": true}))
 
 	if err != nil {
 		panic(err)
@@ -68,10 +60,11 @@ func ParseDir(dirPath, outputDir, pkgName string) error {
 	for _, file := range files {
 		fileName, mapName, err := parseFile(file, outputDir, pkgName)
 		if err != nil {
-			return err
+			fmt.Println(err.Error())
+			panic(err)
 		}
 		memberName := strtool.FirstUpper(fileName) + "Table"
-		outFile.WriteString(fmt.Sprintf("\t\t%s\t\t%s\n", memberName, mapName))
+		outFile.WriteString(fmt.Sprintf("\t\t%s\t\t*%s\n", memberName, mapName))
 		fileCreateList = append(fileCreateList, "Create"+memberName)
 		memberNameList = append(memberNameList, memberName)
 	}

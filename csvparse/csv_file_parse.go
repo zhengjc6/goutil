@@ -3,8 +3,8 @@ package csvparse
 import (
 	"encoding/csv"
 	"fmt"
-	"goutil/strtool"
 	"io"
+	"metaserver/pkg/strtool"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,16 +13,19 @@ import (
 )
 
 var typeMap map[string]string
+var regCol *regexp.Regexp
 
 func init() {
 	typeMap = map[string]string{
-		"int":      "int64",
-		"string":   "string",
-		"float":    "float64",
-		"[]int":    "[]int64",
-		"[]string": "[]string",
-		"[]float":  "[]float64",
+		"int":           "int64",
+		"string":        "string",
+		"float":         "float64",
+		"list<long>":    "[]int64",
+		"list<int>":     "[]int64",
+		"list<string>":  "[]string",
+		"list<float64>": "[]float64",
 	}
+	regCol = regexp.MustCompile(`\|`)
 }
 
 func parseCol(colName, colType, colStr string) string {
@@ -33,91 +36,49 @@ func parseCol(colName, colType, colStr string) string {
 		}
 		return fmt.Sprintf("%s:%s", colName, colStr)
 	case "string":
-		return fmt.Sprintf("%s:\"%s\"", colName, colStr)
-	case "[]int", "[]float":
-		rexp := regexp.MustCompile("[|]")
-		colStr = rexp.ReplaceAllLiteralString(colStr, ",")
-		return fmt.Sprintf("%s:%s{%s}", colName, typeMap[colType], colStr)
-	case "[]string":
+		return fmt.Sprintf("%s:`%s`", colName, colStr)
+	case "list<int>", "list<float>", "list<long>", "list<string>":
 		if colStr == "" {
 			return fmt.Sprintf("%s:%s{}", colName, typeMap[colType])
 		}
-		rexp := regexp.MustCompile("[|]")
-		colStr = rexp.ReplaceAllString(colStr, "\",\"")
-		return fmt.Sprintf("%s:%s{\"%s\"}", colName, typeMap[colType], colStr)
+		colStr = regCol.ReplaceAllLiteralString(colStr, ",")
+		return fmt.Sprintf("%s:%s{%s}", colName, typeMap[colType], colStr)
+	// case "list<string>":
+	// 	if colStr == "" {
+	// 		return fmt.Sprintf("%s:%s{}", colName, typeMap[colType])
+	// 	}
+	// 	rexp := regexp.MustCompile("[|]")
+	// 	colStr = rexp.ReplaceAllString(colStr, "\",\"")
+	// 	return fmt.Sprintf("%s:%s{\"%s\"}", colName, typeMap[colType], colStr)
 	default:
 		panic("Invalid Column Data " + colStr)
 	}
 }
 
-func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapName string, err error) {
-	fmt.Printf("fullPath = %s\n", filePath)
+func parseFileName(filePath string) (fileNameWithSuffix, fileType, fileNameOnly string) {
 
-	fileNameWithSuffix := path.Base(filepath.ToSlash(filePath))
+	fileNameWithSuffix = path.Base(filepath.ToSlash(filePath))
 
-	fileType := path.Ext(fileNameWithSuffix)
+	fileType = path.Ext(fileNameWithSuffix)
 
 	fileNameOnly = strings.TrimSuffix(fileNameWithSuffix, fileType)
+	return
+}
+
+func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapName string, err error) {
+	fmt.Printf("fullPath = %s\n", filePath)
+	fileNameWithSuffix, fileType, fileNameOnly := parseFileName(filePath)
+
 	fmt.Printf("fileNameWithSuffix = %s;\nfileType = %s;\nfileNameOnly = %s;\n",
 		fileNameWithSuffix, fileType, fileNameOnly)
-
 	file, err := os.Open(filePath)
 	if err != nil {
 		return fileNameOnly, mapName, err
 	}
 	defer file.Close()
 	reader := csv.NewReader(file)
-
-	var valcomments []string
-	var valnames []string
-	var valtypes []string
-	var ingoreLine bool
-	var lineNum int
-	var optFlag int
-	for fixInfo := 0; fixInfo < 7; fixInfo |= optFlag {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return fileNameOnly, mapName, err
-		}
-		lineNum++
-		optFlag = 0
-		for i := 0; i < len(record) && fixInfo <= 3; i++ {
-			ingoreLine = false
-			col := strtool.ConvertByte2String([]byte(record[i]), "GB18030")
-			if i == 0 && col[0] == '#' {
-				ingoreLine = true
-				break
-			}
-			col = strings.ToLower(strings.TrimSpace(col))
-			fmt.Printf("%s,", col)
-
-			switch fixInfo {
-			case 0:
-				valcomments = append(valcomments, col)
-				optFlag = 1
-			case 1:
-				valnames = append(valnames, col)
-				optFlag = 2
-			case 3:
-				if _, ok := typeMap[col]; ok {
-					valtypes = append(valtypes, col)
-				} else {
-					return fileNameOnly, mapName, fmt.Errorf("error info: row = %d,col = %d,rawstring = %v", lineNum, i, record[i])
-				}
-				optFlag = 4
-			}
-		}
-		fmt.Printf("\n")
-		if ingoreLine {
-			continue
-		}
-	}
-	if len(valcomments) != len(valnames) || len(valnames) != len(valtypes) {
-		return fileNameOnly, mapName, fmt.Errorf("lack comment or name or type")
-	}
-
+	valcomments, valnames, valtypes, emptyCol := getHeadInfo(fileNameOnly, reader)
+	var invalidCol = len(valnames)
 	outFile, err := os.OpenFile(outputDir+"\\"+strings.ToLower(fileNameOnly)+".go", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0744)
 	if err != nil {
 		return fileNameOnly, mapName, err
@@ -125,17 +86,18 @@ func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapNam
 	defer outFile.Close()
 	//create struct
 	outFile.WriteString(fmt.Sprintf("package %s\n", pkgName))
-	outFile.WriteString(fmt.Sprintf("type %s struct {\n", fileNameOnly))
-	for i := 0; i < len(valcomments); i++ {
-		outFile.WriteString(fmt.Sprintf("\t%s\t\t%s\t\t//%s\n", valnames[i], typeMap[valtypes[i]], valcomments[i]))
+	FirstUpperFileName := strtool.FirstUpper(fileNameOnly)
+	outFile.WriteString(fmt.Sprintf("type %s struct {\n", FirstUpperFileName))
+	for i := 0; i < invalidCol; i++ {
+		outFile.WriteString(fmt.Sprintf("\t%s\t\t%s\t\t//%s\n", strtool.FirstUpper(valnames[i]), typeMap[valtypes[i]], valcomments[i]))
 	}
 	outFile.WriteString("}\n")
 
-	mapName = fmt.Sprintf("map%s", fileNameOnly)
+	mapName = fmt.Sprintf("Map%s", FirstUpperFileName)
 
-	outFile.WriteString(fmt.Sprintf("type %s map[int64]%s\n", mapName, fileNameOnly))
+	outFile.WriteString(fmt.Sprintf("type %s map[int64]%s\n", mapName, FirstUpperFileName))
 
-	outFile.WriteString(fmt.Sprintf("func Create%sTable() %s {\n", strtool.FirstUpper(fileNameOnly), mapName))
+	outFile.WriteString(fmt.Sprintf("func Create%sTable() *%s {\n", FirstUpperFileName, mapName))
 
 	outFile.WriteString(fmt.Sprintf("\tdata := %s{\n", mapName))
 	//continue read csv and fill data
@@ -150,17 +112,22 @@ func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapNam
 			}
 			outFile.WriteString("\t\t")
 			ingoreLine := false
-			for i := 0; i < len(record); i++ {
-				ingoreLine = false
-				col := strtool.ConvertByte2String([]byte(record[i]), "GB18030")
+			for i := 0; i < invalidCol; i++ {
+				if _, ok := emptyCol[i]; ok {
+					continue
+				}
+				col := record[i]
+				//col := strtool.ConvertByte2String([]byte(record[i]), "GB18030")
 				if i == 0 && col[0] == '#' {
 					ingoreLine = true
 					break
 				}
 				if i == 0 {
-					outFile.WriteString(fmt.Sprintf("%s:%s{\n", col, fileNameOnly))
+					outFile.WriteString(fmt.Sprintf("%s:%s{\n", col, FirstUpperFileName))
 				}
-				outFile.WriteString(fmt.Sprintf("\t\t\t%s,\n", parseCol(valnames[i], valtypes[i], col)))
+				if valnames[i] != "" {
+					outFile.WriteString(fmt.Sprintf("\t\t\t%s,\n", parseCol(valnames[i], valtypes[i], col)))
+				}
 			}
 			if ingoreLine {
 				continue
@@ -169,7 +136,7 @@ func parseFile(filePath, outputDir, pkgName string) (fileNameOnly string, mapNam
 		}
 	}()
 	outFile.WriteString("\t}\n")
-	outFile.WriteString("\treturn data\n")
+	outFile.WriteString("\treturn &data\n")
 	outFile.WriteString("}\n")
-	return fileNameOnly, mapName, nil
+	return FirstUpperFileName, mapName, nil
 }

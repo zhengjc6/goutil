@@ -1,12 +1,13 @@
 package redislocker
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 )
 
 type RedisLocker struct {
@@ -17,6 +18,7 @@ type RedisLocker struct {
 	holdTime  time.Duration //lock duration
 	tryCount  int32         //max trying times
 	tryGap    time.Duration //the interval time of tring to get lock
+	ctx       context.Context
 }
 
 type RedisLockerWorker interface {
@@ -29,7 +31,7 @@ func (rl *RedisLocker) Lock() error {
 	var resp *redis.BoolCmd
 	for i := 0; i < int(rl.tryCount); i++ {
 
-		resp = rl.client.SetNX(rl.lockKey, rl.lockValue, rl.holdTime)
+		resp = rl.client.SetNX(rl.ctx, rl.lockKey, rl.lockValue, rl.holdTime)
 
 		lockSuccess, err := resp.Result()
 
@@ -59,7 +61,7 @@ func (rl *RedisLocker) Unlock() error {
 	   	end
 	`)
 
-	resp := script.Run(rl.client, []string{rl.lockKey}, rl.lockValue)
+	resp := script.Run(rl.ctx, rl.client, []string{rl.lockKey}, rl.lockValue)
 
 	if result, err := resp.Result(); err != nil || result == 0 {
 
@@ -95,7 +97,7 @@ func watchDog(rl *RedisLocker) {
 
 		case <-expTicker.C:
 
-			resp := script.Run(rl.client, []string{rl.lockKey}, rl.lockValue, rl.holdTime)
+			resp := script.Run(rl.ctx, rl.client, []string{rl.lockKey}, rl.lockValue, rl.holdTime)
 
 			if result, err := resp.Result(); err != nil || result == int64(0) {
 
@@ -123,5 +125,6 @@ func NewLocker(rclient *redis.Client, key string, val int64) *RedisLocker {
 	locker.tryCount = 100
 	locker.tryGap = time.Second / 100
 	locker.unlockCh = make(chan struct{})
+	locker.ctx = context.Background()
 	return &locker
 }

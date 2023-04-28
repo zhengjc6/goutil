@@ -3,15 +3,15 @@ package main
 import (
 	"fmt"
 	"goutil/csvparse"
+	"goutil/godata"
 	"goutil/redislocker"
 	"goutil/snowflake"
+	"regexp"
 
 	"math/rand"
 	"os"
 	"strings"
 	"time"
-
-	//csvdata "goutil/static/conf"
 
 	"github.com/go-redis/redis"
 )
@@ -53,25 +53,30 @@ func testredislocker() {
 	}
 }
 
-// func testcsvparseread() {
-// 	data := csvdata.CSVData
-// 	data2 := data.UserTable[11]
-// 	fmt.Printf("%+v\n", data)
-// 	fmt.Printf("%+v\n", data2)
-// }
+func testcsvparseread() {
+	data := godata.CSVData
+	data2 := (*(data.ItemTable))[1015010001]
+	fmt.Printf("%+v\n", data)
+	fmt.Printf("%+v\n", data2)
+}
 
 func testcsvparse() {
 	pwd, _ := os.Getwd()
-	fileName := "config"
+	fileName := "excel"
 	var bt strings.Builder
 	bt.WriteString(pwd)
 	bt.WriteString("\\")
 	bt.WriteString(fileName)
-	outDir := pwd + "\\static\\conf"
+	outDir := pwd + "\\godata"
+	tmpCsvDir := pwd + "\\csvtmp"
 	if err := os.RemoveAll(outDir); err != nil && !os.IsNotExist(err) {
 		panic(err)
 	}
-	csvparse.ParseDir(bt.String(), outDir, "csvdata")
+	if err := os.RemoveAll(tmpCsvDir); err != nil && !os.IsNotExist(err) {
+		panic(err)
+	}
+	csvparse.ExcelToCSVAll(bt.String(), tmpCsvDir)
+	csvparse.ParseDir(tmpCsvDir, outDir, "godata")
 }
 
 func testsnowflake() {
@@ -108,6 +113,20 @@ func testsnowflake() {
 	}
 }
 
+func testexcel2lua() {
+	pwd, _ := os.Getwd()
+	fileName := "excel"
+	var bt strings.Builder
+	bt.WriteString(pwd)
+	bt.WriteString("\\")
+	bt.WriteString(fileName)
+	outDir := pwd + "\\luadata"
+	if err := os.RemoveAll(outDir); err != nil && !os.IsNotExist(err) {
+		panic(err)
+	}
+	csvparse.ExcelToLua(bt.String(), outDir)
+}
+
 func main() {
 	// 	testredislocker()
 	// 	time.Sleep(time.Minute)
@@ -115,5 +134,11 @@ func main() {
 	//testcsvparseread()
 	// fmt.Println("return:", testdefer())
 	// fmt.Println("return:", testdefer2())
-	testsnowflake()
+	//testsnowflake()
+	//testexcel2lua()
+	filename := "aaa"
+	pat := fmt.Sprintf(`/%s\.(png|jpg|jpeg)$`, filename)
+	fmt.Println(pat)
+	ok, _ := regexp.MatchString(pat, "http://sdfsdfs/aaa.jpg")
+	fmt.Println(ok)
 }
