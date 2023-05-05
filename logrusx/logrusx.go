@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sync"
 	"time"
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
@@ -18,24 +17,18 @@ type LogrusConfig struct {
 	Save  uint   `yaml:"Save"` //保存文件数，每天一个文件
 }
 
-var (
-	Log  = logrus.New()
-	once sync.Once
-)
-
-func InitLog(cfg LogrusConfig) {
-	once.Do(func() {
-		Log.SetOutput(os.Stdout)
-		var loglevel logrus.Level
-		err := loglevel.UnmarshalText([]byte(cfg.Level))
-		if err != nil {
-			fmt.Printf("set log level fail%v", err)
-			panic(err)
-		}
-		Log.SetLevel(loglevel)
-		Log.SetFormatter(&logrus.TextFormatter{})
-		LocalFilesystemLogger(cfg.Path, cfg.Save)
-	})
+func NewLog(cfg LogrusConfig) *logrus.Logger {
+	Log := logrus.New()
+	Log.SetOutput(os.Stdout)
+	var loglevel logrus.Level
+	err := loglevel.UnmarshalText([]byte(cfg.Level))
+	if err != nil {
+		fmt.Printf("set log level fail%v", err)
+		panic(err)
+	}
+	Log.SetLevel(loglevel)
+	LocalFilesystemLogger(Log, cfg.Path, cfg.Save)
+	return Log
 }
 
 func logWriter(logPath string, level string, save uint) *rotatelogs.RotateLogs {
@@ -52,8 +45,9 @@ func logWriter(logPath string, level string, save uint) *rotatelogs.RotateLogs {
 	return logwriter
 }
 
-func LocalFilesystemLogger(logPath string, save uint) {
+func LocalFilesystemLogger(Log *logrus.Logger, logPath string, save uint) {
 	lfHook := lfshook.NewHook(lfshook.WriterMap{
+		logrus.TraceLevel: logWriter(logPath, "trace", save), // 为不同级别设置不同的输出目的
 		logrus.DebugLevel: logWriter(logPath, "debug", save), // 为不同级别设置不同的输出目的
 		logrus.InfoLevel:  logWriter(logPath, "info", save),
 		logrus.WarnLevel:  logWriter(logPath, "warn", save),
